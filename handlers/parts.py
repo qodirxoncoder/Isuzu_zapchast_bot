@@ -36,7 +36,7 @@ class AddPart(StatesGroup):
 async def search_start(message: Message, state: FSMContext):
     await state.clear()
     await message.answer(
-        "Zapchast nomini, kodini yoki modelini yozing:",
+        "Zapchast nomini, kodini, modelini yoki ID sini yozing:",
         reply_markup=back_btn
     )
     await state.set_state(SearchPart.searching)
@@ -53,24 +53,38 @@ async def search_result(message: Message, state: FSMContext):
     query = message.text.strip()
 
     async with AsyncSessionLocal() as session:
-        result = await session.execute(
-            select(Part).where(
-                or_(
-                    Part.nomi.ilike(f"%{query}%"),
-                    Part.kodi.ilike(f"%{query}%"),
-                    Part.model.ilike(f"%{query}%"),
-                    Part.id == int(query) if query.isdigit() else False,
+        if query.isdigit():
+            result = await session.execute(
+                select(Part).where(
+                    or_(
+                        Part.id == int(query),
+                        Part.kodi == query,
+                    )
                 )
             )
-        )
+        else:
+            result = await session.execute(
+                select(Part).where(
+                    or_(
+                        Part.nomi.ilike(f"%{query}%"),
+                        Part.kodi.ilike(f"%{query}%"),
+                        Part.model.ilike(f"%{query}%"),
+                    )
+                )
+            )
         parts = result.scalars().all()
 
     if not parts:
         await message.answer("❌ Hech narsa topilmadi. Boshqa so'z bilan qidiring:")
         return
 
+    if len(parts) > 10:
+        await message.answer(f"🔍 <b>{len(parts)} ta</b> natija topildi. Aniqroq qidiring:", parse_mode="HTML")
+        return
+
     for part in parts:
-        text = f"📦 <b>{part.nomi}</b>\n"
+        text = f"🆔 <b>ID: {part.id}</b>\n"
+        text += f"📦 <b>{part.nomi}</b>\n"
         text += f"💰 Narx: <b>{part.narx:,.0f} so'm</b>\n"
         if part.kodi:
             text += f"🔢 Kod: {part.kodi}\n"
