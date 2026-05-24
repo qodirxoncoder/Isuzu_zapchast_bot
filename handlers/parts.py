@@ -59,6 +59,7 @@ async def search_result(message: Message, state: FSMContext):
                     Part.nomi.ilike(f"%{query}%"),
                     Part.kodi.ilike(f"%{query}%"),
                     Part.model.ilike(f"%{query}%"),
+                    Part.id == int(query) if query.isdigit() else False,
                 )
             )
         )
