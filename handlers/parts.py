@@ -212,3 +212,82 @@ async def add_tavsif(message: Message, state: FSMContext):
         reply_markup=main_menu,
         parse_mode="HTML"
     )
+
+
+
+    # ───── BARCHA ZAPCHASTLAR ─────
+
+class ListPart(StatesGroup):
+    browsing = State()
+
+
+@router.message(F.text == "📋 Barcha zapchastlar")
+async def list_parts(message: Message, state: FSMContext):
+    await state.clear()
+    await state.update_data(page=0)
+    await show_page(message, 0)
+    await state.set_state(ListPart.browsing)
+
+
+async def show_page(message: Message, page: int):
+    limit = 5
+    offset = page * limit
+
+    async with AsyncSessionLocal() as session:
+        total_result = await session.execute(select(Part))
+        total = len(total_result.scalars().all())
+
+        result = await session.execute(
+            select(Part).offset(offset).limit(limit)
+        )
+        parts = result.scalars().all()
+
+    if not parts:
+        await message.answer("❌ Bazada hali zapchast yo'q.")
+        return
+
+    text = f"📦 <b>{offset + 1}-{min(offset + limit, total)} / {total} ta zapchast</b>\n\n"
+
+    for i, part in enumerate(parts, start=offset + 1):
+        text += f"{i}. <b>{part.nomi}</b> — {part.narx:,.0f} so'm"
+        if part.model:
+            text += f" | {part.model}"
+        if part.kodi:
+            text += f" | #{part.kodi}"
+        text += "\n"
+
+    nav_buttons = []
+    if page > 0:
+        nav_buttons.append(KeyboardButton(text="⬅️ Oldingi"))
+    if offset + limit < total:
+        nav_buttons.append(KeyboardButton(text="➡️ Keyingi"))
+
+    keyboard = ReplyKeyboardMarkup(
+        keyboard=[nav_buttons, [KeyboardButton(text="🔙 Ortga")]],
+        resize_keyboard=True
+    ) if nav_buttons else ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="🔙 Ortga")]],
+        resize_keyboard=True
+    )
+
+    await message.answer(text, reply_markup=keyboard, parse_mode="HTML")
+
+
+@router.message(ListPart.browsing)
+async def browse_parts(message: Message, state: FSMContext):
+    if message.text == "🔙 Ortga":
+        from handlers.menu import main_menu
+        await state.clear()
+        await message.answer("Asosiy menyu:", reply_markup=main_menu)
+        return
+
+    data = await state.get_data()
+    page = data.get("page", 0)
+
+    if message.text == "➡️ Keyingi":
+        page += 1
+    elif message.text == "⬅️ Oldingi":
+        page -= 1
+
+    await state.update_data(page=page)
+    await show_page(message, page)
