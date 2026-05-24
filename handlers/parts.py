@@ -5,6 +5,9 @@ from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy import select, or_
 from database.db import AsyncSessionLocal
 from database.models import Part
+from aiogram import Router, F, Bot
+import csv
+import io
 
 router = Router()
 
@@ -291,3 +294,123 @@ async def browse_parts(message: Message, state: FSMContext):
 
     await state.update_data(page=page)
     await show_page(message, page)
+
+
+
+
+ # ───── CSV YUKLASH ─────
+import csv
+import io
+
+
+class CsvUpload(StatesGroup):
+    waiting = State()
+
+
+@router.message(F.text == "📥 CSV yuklash")
+async def csv_upload_start(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer(
+        "Zapchastlarni ikki usulda yuborishingiz mumkin:\n\n"
+        "1️⃣ <b>Matn sifatida:</b>\n"
+        "<code>Havo filtri,85000,AF-1234,NPR,Motor,5,Original\n"
+        "Moy filtri,65000,MF-5678,NQR,Motor,3,</code>\n\n"
+        "2️⃣ <b>CSV fayl sifatida</b> (to'g'ridan-to'g'ri .csv fayl)\n\n"
+        "📌 Format: <code>nomi,narx,kodi,model,kategoriya,dukonda_nechta,tavsif</code>\n"
+        "⚠️ Faqat <b>nomi</b> va <b>narx</b> majburiy",
+        reply_markup=back_btn,
+        parse_mode="HTML"
+    )
+    await state.set_state(CsvUpload.waiting)
+
+
+async def process_lines(content: str):
+    qushildi = 0
+    xato = 0
+
+    async with AsyncSessionLocal() as session:
+        for line in content.splitlines():
+            try:
+                line = line.strip()
+                if not line:
+                    continue
+
+                qismlar = line.split(",")
+
+                if len(qismlar) < 2:
+                    xato += 1
+                    continue
+
+                nomi = qismlar[0].strip()
+                narx = qismlar[1].strip()
+
+                if not nomi or not narx:
+                    xato += 1
+                    continue
+
+                part = Part(
+                    nomi=nomi,
+                    narx=float(narx.replace(" ", "")),
+                    kodi=qismlar[2].strip() or None if len(qismlar) > 2 else None,
+                    model=qismlar[3].strip() or None if len(qismlar) > 3 else None,
+                    kategoriya=qismlar[4].strip() or None if len(qismlar) > 4 else None,
+                    dukonda_nechta=int(qismlar[5].strip()) if len(qismlar) > 5 and qismlar[5].strip() else None,
+                    tavsif=qismlar[6].strip() or None if len(qismlar) > 6 else None,
+                )
+                session.add(part)
+                qushildi += 1
+            except Exception:
+                xato += 1
+                continue
+
+        await session.commit()
+
+    return qushildi, xato
+
+
+@router.message(CsvUpload.waiting)
+async def csv_process(message: Message, state: FSMContext, bot: Bot):
+    if message.text == "🔙 Ortga":
+        from handlers.menu import main_menu
+        await state.clear()
+        await message.answer("Asosiy menyu:", reply_markup=main_menu)
+        return
+
+    content = None
+
+    if message.document:
+        file_name = message.document.file_name or ""
+        if not file_name.endswith(".csv"):
+            await message.answer("❌ Faqat .csv fayl qabul qilinadi.")
+            return
+        await message.answer("⏳ Fayl o'qilmoqda...")
+        file = await bot.get_file(message.document.file_id)
+        file_bytes = await bot.download_file(file.file_path)
+        try:
+            content = file_bytes.read().decode("utf-8")
+            lines = content.splitlines()
+            if lines and "nomi" in lines[0].lower():
+                content = "\n".join(lines[1:])
+        except Exception as e:
+            await message.answer(f"❌ Faylni o'qishda xato: {e}")
+            return
+
+    elif message.text:
+        content = message.text.strip()
+        lines = content.splitlines()
+        if lines and "nomi" in lines[0].lower():
+            content = "\n".join(lines[1:])
+    else:
+        await message.answer("❌ Matn yoki CSV fayl yuboring.")
+        return
+
+    qushildi, xato = await process_lines(content)
+
+    from handlers.menu import main_menu
+    await state.clear()
+    await message.answer(
+        f"✅ <b>{qushildi} ta</b> zapchast qo'shildi!\n"
+        f"❌ <b>{xato} ta</b> qator o'tkazib yuborildi.",
+        reply_markup=main_menu,
+        parse_mode="HTML"
+    )

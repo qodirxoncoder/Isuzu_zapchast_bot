@@ -8,7 +8,8 @@ main_menu = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="🔍 Zapchast qidirish")],
         [KeyboardButton(text="➕ Zapchast qo'shish")],
-        [KeyboardButton(text="📋 Barcha zapchastlar")]
+        [KeyboardButton(text="📋 Barcha zapchastlar")],
+        [KeyboardButton(text="📥 CSV yuklash")]
 
     ],
     resize_keyboard=True
