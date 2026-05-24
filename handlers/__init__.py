@@ -1,0 +1,2 @@
+from handlers.menu import router as menu_router
+from handlers.parts import router as parts_router

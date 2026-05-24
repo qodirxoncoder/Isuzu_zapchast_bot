@@ -14,6 +14,9 @@ back_btn = ReplyKeyboardMarkup(
 )
 
 
+class SearchPart(StatesGroup):
+    searching = State()
+
 class AddPart(StatesGroup):
     nomi = State()
     narx = State()
@@ -33,10 +36,10 @@ async def search_start(message: Message, state: FSMContext):
         "Zapchast nomini, kodini yoki modelini yozing:",
         reply_markup=back_btn
     )
-    await state.set_state("searching")
+    await state.set_state(SearchPart.searching)
 
 
-@router.message(F.state == "searching")
+@router.message(SearchPart.searching)
 async def search_result(message: Message, state: FSMContext):
     if message.text == "🔙 Ortga":
         from handlers.menu import main_menu
