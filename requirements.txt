@@ -3,4 +3,4 @@ sqlalchemy
 aiosqlite
 python-dotenv
 greenlet
-aiofilesaiofiles
+aiofiles

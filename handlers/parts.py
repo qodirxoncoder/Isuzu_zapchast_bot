@@ -1,11 +1,10 @@
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from sqlalchemy import select, or_
 from database.db import AsyncSessionLocal
 from database.models import Part
-from aiogram import Router, F, Bot
 import csv
 import io
 
@@ -233,7 +232,7 @@ async def add_tavsif(message: Message, state: FSMContext):
 
 
 
-    # ───── BARCHA ZAPCHASTLAR ─────
+# ───── BARCHA ZAPCHASTLAR ─────
 
 class ListPart(StatesGroup):
     browsing = State()
@@ -311,11 +310,7 @@ async def browse_parts(message: Message, state: FSMContext):
     await show_page(message, page)
 
 
-
-
- # ───── CSV YUKLASH ─────
-import csv
-import io
+# ───── CSV YUKLASH ─────
 
 
 class CsvUpload(StatesGroup):
