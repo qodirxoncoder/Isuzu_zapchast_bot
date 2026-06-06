@@ -1,0 +1,10 @@
+run = "python bot.py"
+
+[env]
+PYTHONUNBUFFERED = "1"
+
+[nix]
+channel = "stable-23_11"
+
+[[ports]]
+express = true
